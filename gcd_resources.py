@@ -14,6 +14,11 @@ from System.IO import Directory, File, Path
 
 #==============================================================================
 class Resources(object):
+   # Per-user data folder name, under %APPDATA%
+   PROFILE_DIRECTORY_NAME = 'Local Grand Comics Database Scraper'
+
+   PROFILE_DIRECTORY = None
+   LOG_DIRECTORY = None
    LOCAL_CACHE_DIRECTORY = None
    SETTINGS_FILE = None
    ADVANCED_FILE = None
@@ -32,10 +37,10 @@ class Resources(object):
       ''' Initializes directory structures and paths for configuration. '''
       script_dir = Directory.GetParent(__file__).FullName
       
-      # Isolated user data directory path for the standalone local GCD scraper
-      profile_dir = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData) + \
-         r"\Local Grand Comics Database Scraper"
-      
+      profile_dir = cls.get_profile_directory()
+
+      cls.PROFILE_DIRECTORY = profile_dir
+      cls.LOG_DIRECTORY = Path.Combine(profile_dir, 'logs')
       cls.SETTINGS_FILE = Path.Combine(profile_dir, 'settings.dat')
       cls.ADVANCED_FILE = Path.Combine(profile_dir, 'advanced.dat')
       cls.GEOMETRY_FILE = Path.Combine(profile_dir, 'geometry.dat')
@@ -46,8 +51,13 @@ class Resources(object):
       if not Directory.Exists(profile_dir):
          Directory.CreateDirectory(profile_dir)
 
-      # Import any legacy settings from the old directory if they exist
-      cls.__import_legacy_settings(script_dir, profile_dir)
+   #===========================================================================
+   @classmethod
+   def get_profile_directory(cls):
+      ''' Returns this plugin's per-user data folder (it may not exist yet). '''
+      return Path.Combine(
+         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+         cls.PROFILE_DIRECTORY_NAME)
 
    #===========================================================================
    @classmethod
@@ -57,12 +67,6 @@ class Resources(object):
       if File.Exists(dir + 'localscraper.png'):
          return Image.FromFile(dir + 'localscraper.png')
       return Bitmap(100, 100)
-
-   #===========================================================================
-   @classmethod
-   def createComicVineLogo(cls):
-      ''' Legacy alias wrapper pointing directly to our isolated logo generator. '''
-      return cls.createGCDLogo()
 
    #===========================================================================
    @classmethod
@@ -76,24 +80,3 @@ class Resources(object):
       if File.Exists(f):
          return Image.FromFile(f)
       return Bitmap(16, 16)
-
-   #==============================================================================
-   @classmethod
-   def __import_legacy_settings(cls, legacy_dir, profile_dir):
-      ''' Safely copies legacy config maps into the AppData tree profile folder. '''
-      settings_file = Path.Combine(legacy_dir, 'settings.dat')
-      advanced_file = Path.Combine(legacy_dir, 'advanced.dat')
-      geometry_file = Path.Combine(legacy_dir, 'geometry.dat')
-      series_file = Path.Combine(legacy_dir, 'series.dat')
-      
-      try:
-         if File.Exists(settings_file) and not File.Exists(cls.SETTINGS_FILE):
-            File.Copy(settings_file, cls.SETTINGS_FILE, False)
-         if File.Exists(advanced_file) and not File.Exists(cls.ADVANCED_FILE):
-            File.Copy(advanced_file, cls.ADVANCED_FILE, False)
-         if File.Exists(geometry_file) and not File.Exists(cls.GEOMETRY_FILE):
-            File.Copy(geometry_file, cls.GEOMETRY_FILE, False)
-         if File.Exists(series_file) and not File.Exists(cls.SERIES_FILE):
-            File.Copy(series_file, cls.SERIES_FILE, False)
-      except:
-         pass

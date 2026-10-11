@@ -85,17 +85,17 @@ def install(app_window=None):
    __app_window = app_window
    __logger = __Logger()
    
-   # Set up auto-log file in user's AppData for crash debugging
+   # Set up auto-log file in the plugin's AppData folder for crash debugging
    try:
-      log_dir = Path.Combine(
-         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-         "Local Comic Vine Scraper", "logs")
+      from gcd_resources import Resources
+      log_dir = Resources.LOG_DIRECTORY or \
+         Path.Combine(Resources.get_profile_directory(), "logs")
       if not Directory.Exists(log_dir):
          Directory.CreateDirectory(log_dir)
-      _auto_log_path = Path.Combine(log_dir, 
-         "cvs-session-" + DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss") + ".log")
+      _auto_log_path = Path.Combine(log_dir,
+         "gcd-session-" + DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss") + ".log")
       # Write initial marker
-      _write_to_auto_log("=== Local Comic Vine Scraper Log Started: " + 
+      _write_to_auto_log("=== GCD Local Scraper Log Started: " +
          DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " ===\n")
    except:
       _auto_log_path = None  # Disable auto-logging on error
@@ -276,7 +276,7 @@ def save(show_error_message=False):
    
    def dosave():
       dialog = SaveFileDialog()
-      dialog.FileName="cvs-debug-log-" + \
+      dialog.FileName="gcd-debug-log-" + \
          DateTime.Today.ToString("yyyy-MM-dd") + ".txt"
       dialog.Title = i18n.get("LogSaveTitle")
       dialog.Filter = i18n.get("LogSaveFilter")+'|*.*'
