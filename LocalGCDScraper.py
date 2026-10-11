@@ -27,7 +27,7 @@ try:
         script_dir = Directory.GetCurrentDirectory()
         if "Program Files" in script_dir:
             appdata = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
-            script_dir = SysPath.Combine(appdata, r"cYo\ComicRack Community Edition\Scripts\Local Grand Comics Scraper")
+            script_dir = SysPath.Combine(appdata, r"cYo\ComicRack Community Edition\Scripts\GCD Local Scraper")
     
     if Directory.Exists(script_dir) and script_dir not in sys.path:
         sys.path.insert(0, script_dir)

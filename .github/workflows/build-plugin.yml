@@ -1,0 +1,55 @@
+name: Build crplugin
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read plugin name and version from package.ini
+        id: meta
+        run: |
+          name=$(sed -n 's/^Name=//p' package.ini | tr -d '\r')
+          version=$(sed -n 's/^Version=//p' package.ini | tr -d '\r')
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "file=$name.crplugin" >> "$GITHUB_OUTPUT"
+
+      - name: Package tracked files (excluding CI files)
+        run: |
+          mkdir -p dist
+          git archive --format=zip -o "dist/${{ steps.meta.outputs.file }}" HEAD -- . \
+            ':(exclude).github' ':(exclude).gitignore' ':(exclude).gitattributes'
+          unzip -l "dist/${{ steps.meta.outputs.file }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.name }}-${{ steps.meta.outputs.version }}
+          path: dist/${{ steps.meta.outputs.file }}
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" dist/*.crplugin --repo "${{ github.repository }}" --generate-notes
