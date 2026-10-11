@@ -36,7 +36,7 @@ from System.Drawing import Image
 __perceptual_hash_cache = None
 
 # Hash indexes for O(1) exact match lookup
-# Format: {hash_value: [(cvid, source), ...]}
+# Format: {hash_value: [(issue_id, source), ...]}
 __phash_index = None
 __ahash_index = None
 
@@ -71,19 +71,19 @@ def initialize_hash_cache():
         
         phash_count = 0
         ahash_count = 0
-        for cvid, ct_phash, ct_ahash, source in __perceptual_hash_cache:
+        for issue_id, ct_phash, ct_ahash, source in __perceptual_hash_cache:
             # Ensure unsigned 64-bit (defensive, should already be masked from DB load)
             if ct_phash:
                 ct_phash_masked = ct_phash & 0xFFFFFFFFFFFFFFFF
                 if ct_phash_masked not in __phash_index:
                     __phash_index[ct_phash_masked] = []
-                __phash_index[ct_phash_masked].append((cvid, source))
+                __phash_index[ct_phash_masked].append((issue_id, source))
                 phash_count += 1
             if ct_ahash:
                 ct_ahash_masked = ct_ahash & 0xFFFFFFFFFFFFFFFF
                 if ct_ahash_masked not in __ahash_index:
                     __ahash_index[ct_ahash_masked] = []
-                __ahash_index[ct_ahash_masked].append((cvid, source))
+                __ahash_index[ct_ahash_masked].append((issue_id, source))
                 ahash_count += 1
         
         log.debug("Loaded " + sstr(len(__perceptual_hash_cache)), 
@@ -185,7 +185,7 @@ def _try_md5_matching(book):
                 log.debug("Calculated file MD5: " + file_md5)
                 issue_ref = db.query_issue_by_md5(file_md5)
                 if issue_ref:
-                    log.debug("Found exact MD5 file match! CVID: " + 
+                    log.debug("Found exact MD5 file match! issue ID: " + 
                               sstr(issue_ref.issue_key))
                     series_ref = db.get_series_ref_for_issue(issue_ref.issue_key)
                     return (issue_ref, series_ref, HashMatchTypes.MD5_FILE)
@@ -201,7 +201,7 @@ def _try_md5_matching(book):
             log.debug("Calculated first page MD5: " + first_page_md5)
             issue_ref = db.query_issue_by_first_page_md5(first_page_md5)
             if issue_ref:
-                log.debug("Found exact MD5 first page match! CVID: " + 
+                log.debug("Found exact MD5 first page match! issue ID: " + 
                           sstr(issue_ref.issue_key))
                 series_ref = db.get_series_ref_for_issue(issue_ref.issue_key)
                 return (issue_ref, series_ref, HashMatchTypes.MD5_PAGE)
@@ -292,24 +292,24 @@ def _try_perceptual_hash_matching(book, threshold):
     exact_matches = _find_exact_hash_matches(book_phash, book_ahash)
     if exact_matches:
         log.debug("Found " + sstr(len(exact_matches)) + " exact hash match(es) via index lookup")
-        # Group by CVID
-        cvid_map = {}
-        for cvid, hash_type, source in exact_matches:
-            if cvid not in cvid_map:
-                cvid_map[cvid] = (0, hash_type, source)
+        # Group by issue ID
+        issue_id_map = {}
+        for issue_id, hash_type, source in exact_matches:
+            if issue_id not in issue_id_map:
+                issue_id_map[issue_id] = (0, hash_type, source)
         
-        unique_cvids = list(cvid_map.keys())
-        if len(unique_cvids) == 1:
-            cvid = unique_cvids[0]
-            distance, hash_type, source = cvid_map[cvid]
-            log.debug("Single exact match found! CVID: " + sstr(cvid), 
+        unique_issue_ids = list(issue_id_map.keys())
+        if len(unique_issue_ids) == 1:
+            issue_id = unique_issue_ids[0]
+            distance, hash_type, source = issue_id_map[issue_id]
+            log.debug("Single exact match found! issue ID: " + sstr(issue_id), 
                       ", type: ", hash_type, ", source: ", source)
-            issue_ref = db.get_issue_ref_by_cvid(cvid)
-            series_ref = db.get_series_ref_for_issue(cvid)
+            issue_ref = db.get_issue_ref_by_id(issue_id)
+            series_ref = db.get_series_ref_for_issue(issue_id)
             return (issue_ref, series_ref, hash_type)
         else:
-            log.debug("Multiple exact matches - will need user selection. CVIDs: " + 
-                      sstr(unique_cvids[:5]))
+            log.debug("Multiple exact matches - will need user selection. issue IDs: " + 
+                      sstr(unique_issue_ids[:5]))
             return (None, None, None)
     
     # SLOW PATH: No exact match, search for fuzzy matches within threshold
@@ -319,7 +319,7 @@ def _try_perceptual_hash_matching(book, threshold):
     if not matches:
         if closest_match:
             log.debug("No perceptual hash matches found within threshold ", 
-                      sstr(threshold), ". Closest match: CVID ", 
+                      sstr(threshold), ". Closest match: issue ID ", 
                       sstr(closest_match[0]), " at distance ", 
                       sstr(closest_match[1]), " (", closest_match[2], ")")
         else:
@@ -334,33 +334,33 @@ def _try_perceptual_hash_matching(book, threshold):
         matches = perfect_matches
         log.debug("Found ", sstr(len(perfect_matches)), " perfect phash match(es)")
     
-    # Group matches by CVID (same issue might appear in both tables)
-    cvid_map = {}  # cvid -> best (distance, hash_type, source)
-    for cvid, distance, hash_type, source in matches:
-        if cvid not in cvid_map or distance < cvid_map[cvid][0]:
-            cvid_map[cvid] = (distance, hash_type, source)
+    # Group matches by issue ID (same issue might appear in both tables)
+    issue_id_map = {}  # issue_id -> best (distance, hash_type, source)
+    for issue_id, distance, hash_type, source in matches:
+        if issue_id not in issue_id_map or distance < issue_id_map[issue_id][0]:
+            issue_id_map[issue_id] = (distance, hash_type, source)
     
-    unique_cvids = list(cvid_map.keys())
-    log.debug("Found ", sstr(len(unique_cvids)), " unique CVID(s) matching")
+    unique_issue_ids = list(issue_id_map.keys())
+    log.debug("Found ", sstr(len(unique_issue_ids)), " unique issue ID(s) matching")
     
-    # If exactly one unique CVID, return it
-    if len(unique_cvids) == 1:
-        cvid = unique_cvids[0]
-        distance, hash_type, source = cvid_map[cvid]
-        log.debug("Single match found! CVID: ", sstr(cvid), 
+    # If exactly one unique issue ID, return it
+    if len(unique_issue_ids) == 1:
+        issue_id = unique_issue_ids[0]
+        distance, hash_type, source = issue_id_map[issue_id]
+        log.debug("Single match found! issue ID: ", sstr(issue_id), 
                   ", distance: ", sstr(distance),
                   ", type: ", hash_type, ", source: ", source)
         
-        issue_ref = db.get_issue_ref_by_cvid(cvid)
-        series_ref = db.get_series_ref_for_issue(cvid)
+        issue_ref = db.get_issue_ref_by_id(issue_id)
+        series_ref = db.get_series_ref_for_issue(issue_id)
         return (issue_ref, series_ref, hash_type)
     
-    # Multiple CVIDs matched - this needs user selection
+    # Multiple issue IDs matched - this needs user selection
     # For now, return None to fall through to manual search
     # TODO: Implement a selection dialog for multiple phash matches?
-    log.debug("Multiple CVIDs matched with same confidence - ",
-              "falling through to manual search. CVIDs: ",
-              sstr(unique_cvids[:5]), "..." if len(unique_cvids) > 5 else "")
+    log.debug("Multiple issue IDs matched with same confidence - ",
+              "falling through to manual search. issue IDs: ",
+              sstr(unique_issue_ids[:5]), "..." if len(unique_issue_ids) > 5 else "")
     
     return (None, None, None)
 
@@ -416,7 +416,7 @@ def _find_exact_hash_matches(book_phash, book_ahash):
         book_ahash: Book's average hash
         
     Returns:
-        List of (cvid, hash_type, source) tuples for exact matches, or empty list
+        List of (issue_id, hash_type, source) tuples for exact matches, or empty list
     '''
     global __phash_index, __ahash_index
     
@@ -424,13 +424,13 @@ def _find_exact_hash_matches(book_phash, book_ahash):
     
     # Check phash index
     if book_phash and __phash_index and book_phash in __phash_index:
-        for cvid, source in __phash_index[book_phash]:
-            matches.append((cvid, HashMatchTypes.PHASH, source))
+        for issue_id, source in __phash_index[book_phash]:
+            matches.append((issue_id, HashMatchTypes.PHASH, source))
     
     # Check ahash index
     if book_ahash and __ahash_index and book_ahash in __ahash_index:
-        for cvid, source in __ahash_index[book_ahash]:
-            matches.append((cvid, HashMatchTypes.AHASH, source))
+        for issue_id, source in __ahash_index[book_ahash]:
+            matches.append((issue_id, HashMatchTypes.AHASH, source))
     
     return matches
 
@@ -450,8 +450,8 @@ def _find_perceptual_matches(book_phash, book_ahash, threshold):
         
     Returns:
         Tuple of (matches_list, closest_match)
-        matches_list: List of tuples (cvid, distance, hash_type, source) within threshold
-        closest_match: Tuple (cvid, distance, hash_type, source) of closest match beyond threshold, or None
+        matches_list: List of tuples (issue_id, distance, hash_type, source) within threshold
+        closest_match: Tuple (issue_id, distance, hash_type, source) of closest match beyond threshold, or None
     '''
     global __perceptual_hash_cache
     
@@ -462,14 +462,14 @@ def _find_perceptual_matches(book_phash, book_ahash, threshold):
     # PHASE 1: Try phash matching first (ComicTagger waterfall behavior)
     if book_phash:
         log.debug("Trying phash matching (threshold=" + sstr(threshold), ")...")
-        for cvid, db_phash, db_ahash, source in __perceptual_hash_cache:
+        for issue_id, db_phash, db_ahash, source in __perceptual_hash_cache:
             if db_phash:
                 phash_dist = hamming_distance(book_phash, db_phash)
                 if phash_dist <= threshold:
-                    matches.append((cvid, phash_dist, HashMatchTypes.PHASH, source))
+                    matches.append((issue_id, phash_dist, HashMatchTypes.PHASH, source))
                 elif phash_dist < closest_distance:
                     closest_distance = phash_dist
-                    closest_beyond_threshold = (cvid, phash_dist, HashMatchTypes.PHASH, source)
+                    closest_beyond_threshold = (issue_id, phash_dist, HashMatchTypes.PHASH, source)
         
         if matches:
             log.debug("GCD Hash Matcher: found " + sstr(len(matches)) + " database visual matches")
@@ -485,14 +485,14 @@ def _find_perceptual_matches(book_phash, book_ahash, threshold):
         closest_distance = 65
         
         log.debug("Trying ahash matching (threshold=" + sstr(threshold), ")...")
-        for cvid, db_phash, db_ahash, source in __perceptual_hash_cache:
+        for issue_id, db_phash, db_ahash, source in __perceptual_hash_cache:
             if db_ahash:
                 ahash_dist = hamming_distance(book_ahash, db_ahash)
                 if ahash_dist <= threshold:
-                    matches.append((cvid, ahash_dist, HashMatchTypes.AHASH, source))
+                    matches.append((issue_id, ahash_dist, HashMatchTypes.AHASH, source))
                 elif ahash_dist < closest_distance:
                     closest_distance = ahash_dist
-                    closest_beyond_threshold = (cvid, ahash_dist, HashMatchTypes.AHASH, source)
+                    closest_beyond_threshold = (issue_id, ahash_dist, HashMatchTypes.AHASH, source)
         
         if matches:
             log.debug("Found " + sstr(len(matches)) + " ahash match(es)")

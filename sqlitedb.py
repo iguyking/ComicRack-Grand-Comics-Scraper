@@ -117,24 +117,26 @@ def _parse_key_tag(text_s):
    try:
       tag_found = re.search(r'(?i)' + Tags.KEY_TAG_PREFIX + r'(\d{1,})', clean_text)
       if not tag_found:
-         # Safely search for escaped GCD or ComicVine ID tag sets
+         # Also accept the bracketed "GCD[12345]" form.  ComicVine tags are
+         # deliberately ignored: their IDs don't correspond to GCD issue IDs.
          tag_found = re.search(r'(?i)GCD\.?\[(\d{1,})', clean_text)
-      if not tag_found:
-         tag_found = re.search(r'(?i)ComicVine\.?\[(\d{1,})', clean_text)
-         
+
       return int(tag_found.group(1).lower()) if tag_found else None
    except Exception as re_ex:
       log.debug("Key tag regex parsing failed (safely bypassed): " + sstr(re_ex))
       return None
 
 def _check_magic_file(path_s):
+   ''' Reads a 'gcdinfo.txt' (or 'gcdinfo') file containing a comics.org series
+       or issue URL.  ComicVine 'cvinfo' files are ignored, since their IDs
+       don't correspond to GCD IDs. '''
    series_ref = None
    file_s = None
    try:
       dir_s = path_s if path_s and Directory.Exists(path_s) else Path.GetDirectoryName(path_s) if path_s else None
       dir_s = dir_s if dir_s and Directory.Exists(dir_s) else None
       if dir_s:
-         for f in [dir_s + "\\" + x for x in ["cvinfo.txt", "cvinfo"]]:
+         for f in [dir_s + "\\" + x for x in ["gcdinfo.txt", "gcdinfo"]]:
             if File.Exists(f):
                file_s = f
          if file_s:
@@ -222,23 +224,15 @@ def __dict_to_series_ref(row):
    return SeriesRef(series_id, name, start_year if start_year else -1, publisher, issue_count if issue_count else 0, image_url)
 
 def __url_to_seriesref(url_s):
+   ''' Converts a comics.org series URL (.../series/123/) or issue URL
+       (.../issue/456/) into the matching SeriesRef, or returns None. '''
    url_s = url_s.strip()
-   pattern = r"^.*?\\b(4000)-(?P<num>\\d{2,})\\b.*$"
-   match = re.match(pattern, url_s, re.I)
-   if match:
-      issue_id = int(match.group("num"))
-      try:
-         sql = "SELECT series_id FROM gcd_issue WHERE id = @p0"
-         results = __connection.Query(sql, issue_id)
-         if results and len(results) > 0:
-            series_id = results[0]["series_id" if "series_id" in results[0] else "c0"]
-            url_s = "4050-" + sstr(series_id)
-      except:
-         pass
-   pattern = r"^.*?\\b(49|4050)-(?P<num>\\d{2,})\\b.*$"
-   match = re.match(pattern, url_s, re.I)
+   match = re.search(r"(?i)\bcomics\.org/series/(?P<num>\d+)", url_s)
    if match:
       return __get_series_ref_by_id(int(match.group("num")))
+   match = re.search(r"(?i)\bcomics\.org/issue/(?P<num>\d+)", url_s)
+   if match:
+      return get_series_ref_for_issue(int(match.group("num")))
    return None
 
 def __get_series_ref_by_id(series_id):
@@ -309,6 +303,35 @@ def query_issue_ref(series_ref, issue_num_s):
          return IssueRef(sstr(row["c1"]), int(row["c0"]), fix_mojibake(sstr(row["c2"])), sstr(row["c3"]))
    except:
       pass
+   return None
+
+def get_issue_ref_by_id(issue_id):
+   try:
+      sql = """
+         SELECT i.id, i.number,
+                COALESCE(
+                   NULLIF(i.title, ''),
+                   (SELECT NULLIF(title, '') FROM gcd_story WHERE issue_id = i.id AND title != '' LIMIT 1),
+                   ''
+                ) as display_title
+         FROM gcd_issue i
+         WHERE i.id = @p0
+      """
+      results = __connection.Query(sql, int(issue_id))
+      if results and len(results) > 0:
+         row = results[0]
+         return IssueRef(sstr(row["c1"]), int(row["c0"]), fix_mojibake(sstr(row["c2"])), '')
+   except Exception as ex:
+      log.debug_exc("Error querying issue by id: " + sstr(ex))
+   return None
+
+def get_series_ref_for_issue(issue_id):
+   try:
+      results = __connection.Query("SELECT series_id FROM gcd_issue WHERE id = @p0", int(issue_id))
+      if results and len(results) > 0 and results[0]["c0"]:
+         return __get_series_ref_by_id(int(results[0]["c0"]))
+   except Exception as ex:
+      log.debug_exc("Error querying series for issue: " + sstr(ex))
    return None
 
 def _query_issue(issue_ref, slow_data):

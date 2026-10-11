@@ -23,7 +23,6 @@ class Tags(object):
     # Unique tag prefixes so you can distinguish books processed by this plugin
     SKIP_BOOK = "GCDBSKIP"
     KEY_TAG_PREFIX = "GCD"
-    LEGACY_KEY_PATTERN = r'(?i)GCD.?\[(\d{1,})'
 
 
 #==============================================================================
@@ -34,7 +33,7 @@ class ConfigKeys(object):
     Keys used in the settings.dat configuration file.
     """
     # Database settings
-    API_KEY = 'apiKey'  # Legacy, for ComicVine API
+    API_KEY = 'apiKey'  # Optional ComicVine API key, used only to fetch cover images
     DB_PATH = 'dbPath'  # Path to local SQLite database
     
     # Metadata update toggles
@@ -164,9 +163,6 @@ class FileConstants(object):
     """
     Constants related to file system operations.
     """
-    # Magic file names that can specify series info
-    CVINFO_FILES = ["cvinfo.txt", "cvinfo"]
-    
     # Settings file names (relative to profile directory)
     SETTINGS_FILE = 'settings.dat'
     ADVANCED_FILE = 'advanced.dat'

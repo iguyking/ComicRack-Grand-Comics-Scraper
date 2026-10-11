@@ -7,14 +7,15 @@ alternate databases.  One way to think of it is that the the behaviour of the
 "comic book database" that this module exposes should be understandable entirely  
 in terms of the contract described by the public functions in this module.  
 
-This version uses a local SQLite database instead of the ComicVine API.
+This version is backed by a local Grand Comics Database (GCD) SQLite dump,
+implemented in the sqlitedb module.
 
 @author: Cory Banack (original), modified for local SQLite
 '''
 
 import re
 import gcd_log as log
-import sqlitedb as cvdb  # Use SQLite implementation with cvdb alias for compatibility
+import sqlitedb
 import gcd_utils as utils
 from gcd_utils import sstr
 
@@ -40,7 +41,7 @@ def initialize(**kwargs):
    global __series_ref_cache, __issue_refs_cache
    __series_ref_cache = {}
    __issue_refs_cache = {}
-   cvdb._initialize(**kwargs)
+   sqlitedb._initialize(**kwargs)
    
 # =============================================================================
 def shutdown():
@@ -52,17 +53,17 @@ def shutdown():
    global __series_ref_cache, __issue_refs_cache
    __series_ref_cache = None
    __issue_refs_cache = None
-   cvdb._shutdown()
+   sqlitedb._shutdown()
 
 # =============================================================================
 def get_db_name_s():
    ''' 
    Returns the name (a unique string) describing the current backing database 
-   implementation.  i.e. "ComicVine" or "AnimeVice", etc.  Will not be empty.
+   implementation, i.e. "GCDLocal".  Will not be empty.
    
    This method does not perform any database reads or writes, i.e. it's fast.
    '''
-   return cvdb._get_db_name_s();
+   return sqlitedb._get_db_name_s();
 
 
 # =============================================================================
@@ -75,7 +76,7 @@ def create_key_tag_s(issue_key):
    
    This method does not perform any database reads or writes, i.e. it's fast.
    '''
-   return cvdb._create_key_tag_s(issue_key) if issue_key else None;
+   return sqlitedb._create_key_tag_s(issue_key) if issue_key else None;
 
 
 # =============================================================================
@@ -90,7 +91,7 @@ def parse_key_tag(text_s):
    
    This method does not perform any database reads or writes, i.e. it's fast.
    '''
-   return cvdb._parse_key_tag(text_s) if text_s else None
+   return sqlitedb._parse_key_tag(text_s) if text_s else None
 
 # =============================================================================
 def check_magic_file(path_s):
@@ -107,7 +108,7 @@ def check_magic_file(path_s):
    
    This fuction may need to access the db in order to create a SeriesRef object.
    '''
-   return cvdb._check_magic_file(path_s)
+   return sqlitedb._check_magic_file(path_s)
 
 # =============================================================================
 def query_series_refs( search_terms_s, ignored_search_terms_sl = list(), 
@@ -153,7 +154,7 @@ def query_series_refs( search_terms_s, ignored_search_terms_sl = list(),
    if search_terms_s in __series_ref_cache:
       return list(__series_ref_cache[search_terms_s])
    else:
-      series_refs = cvdb._query_series_refs(search_terms_s, callback_function)
+      series_refs = sqlitedb._query_series_refs(search_terms_s, callback_function)
       if len(__series_ref_cache ) > 10:
          __series_ref_cache = {} # keep the cache from ever getting too big
       __series_ref_cache[search_terms_s] = list(series_refs)
@@ -192,7 +193,7 @@ def query_issue_refs(series_ref, callback_function=lambda x : False):
       issue_refs = set(__issue_refs_cache[series_ref]) 
    else: 
       __issue_refs_cache = {} # only keep one element in cache (else too big!)
-      issue_refs = cvdb._query_issue_refs(series_ref, callback_function)
+      issue_refs = sqlitedb._query_issue_refs(series_ref, callback_function)
       __issue_refs_cache[series_ref] = set(issue_refs) 
    return issue_refs
 
@@ -206,7 +207,7 @@ def query_issue_ref(series_ref, issue_num_s):
    (if, for example, the issue number string doesn't match any issue.)
    '''
    try:
-      return cvdb.query_issue_ref(series_ref, issue_num_s)
+      return sqlitedb.query_issue_ref(series_ref, issue_num_s)
    except Exception as ex:
       log.debug_exc("db.query_issue_ref error: " + sstr(ex))
       return None
@@ -223,7 +224,7 @@ def query_issue(issue_ref, slow_data=False):
    additional OPTIONAL data and add it to the Issue. 
    
    '''
-   return cvdb._query_issue(issue_ref, slow_data)
+   return sqlitedb._query_issue(issue_ref, slow_data)
 
 
 # =============================================================================
@@ -238,7 +239,7 @@ def query_image(ref):
    which must be explicitly Disposed() when you are done with it, in order
    to prevent memory leaks.
    '''
-   return utils.strip_back_cover( cvdb._query_image(ref) )
+   return utils.strip_back_cover( sqlitedb._query_image(ref) )
 
 
 # =============================================================================
@@ -247,7 +248,7 @@ def query_image(ref):
 
 def query_issue_by_md5(md5_hash):
    try:
-      return cvdb.query_issue_by_md5(md5_hash)
+      return sqlitedb.query_issue_by_md5(md5_hash)
    except AttributeError:
       return None # Fail gracefully if GCD has no MD5 index mapping table
 
@@ -262,38 +263,39 @@ def query_issue_by_first_page_md5(first_page_md5):
    Returns:
       IssueRef if found, None otherwise
    '''
-   return cvdb.query_issue_by_first_page_md5(first_page_md5)
+   return sqlitedb.query_issue_by_first_page_md5(first_page_md5)
 
 
 def load_all_perceptual_hashes():
    try:
-      return cvdb.load_all_perceptual_hashes()
+      return sqlitedb.load_all_perceptual_hashes()
    except AttributeError:
       return [] # Return empty layout if GCD lacks visual hashes
 
 
-def get_issue_ref_by_cvid(cvid):
+def get_issue_ref_by_id(issue_id):
    '''
-   Get an IssueRef by its ComicVine issue ID.
-   
+   Get an IssueRef by its database issue ID (e.g. the ID stored with a
+   matched hash).
+
    Args:
-      cvid: ComicVine issue ID (integer)
-      
+      issue_id: database issue ID (integer)
+
    Returns:
       IssueRef if found, None otherwise
    '''
-   return cvdb.get_issue_ref_by_cvid(cvid)
+   return sqlitedb.get_issue_ref_by_id(issue_id)
 
 
-def get_series_ref_for_issue(cvid):
+def get_series_ref_for_issue(issue_id):
    '''
-   Get the SeriesRef for an issue by its ComicVine issue ID.
-   
+   Get the SeriesRef for the issue with the given database issue ID.
+
    Args:
-      cvid: ComicVine issue ID (integer)
-      
+      issue_id: database issue ID (integer)
+
    Returns:
       SeriesRef if found, None otherwise
    '''
-   return cvdb.get_series_ref_for_issue(cvid)
+   return sqlitedb.get_series_ref_for_issue(issue_id)
    

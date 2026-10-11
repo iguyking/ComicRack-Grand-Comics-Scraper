@@ -32,8 +32,8 @@ class ComicBook(object):
    read-only access to some of its data.
    '''
    
-   # Magic tag string for permanently skipping books - use centralized constant
-   CVDBSKIP = Tags.SKIP_BOOK
+   # Magic tag string ("GCDBSKIP") for permanently skipping books
+   GCDBSKIP = Tags.SKIP_BOOK
 
    #===========================================================================   
    def __init__(self, crbook, scraper):
@@ -98,11 +98,11 @@ class ComicBook(object):
       
       if notes == tags or tags:
          bd.tags_sl = self.__add_key_to_tags(bd.tags_sl, None);
-         log.debug("Added " + str(ComicBook.CVDBSKIP) + " flag to comic book 'Tags'")
+         log.debug("Added " + str(ComicBook.GCDBSKIP) + " flag to comic book 'Tags'")
       
       if notes == tags or notes:
          bd.notes_s = self.__add_key_to_notes(bd.notes_s, None)
-         log.debug("Added " + str(ComicBook.CVDBSKIP) + " flag to comic book 'Notes'")
+         log.debug("Added " + str(ComicBook.GCDBSKIP) + " flag to comic book 'Notes'")
          
       bd.update()
          
@@ -112,9 +112,9 @@ class ComicBook(object):
       bd = self.__bookdata
       tagstring = ', '.join(bd.tags_sl)
       
-      skip_found = re.search(r'(?i)'+ComicBook.CVDBSKIP, tagstring)
+      skip_found = re.search(r'(?i)'+ComicBook.GCDBSKIP, tagstring)
       if not skip_found:
-         skip_found = re.search(r'(?i)'+ComicBook.CVDBSKIP, bd.notes_s)
+         skip_found = re.search(r'(?i)'+ComicBook.GCDBSKIP, bd.notes_s)
       retval = "skip" if skip_found else None
    
       if retval is None:   
@@ -431,7 +431,7 @@ class ComicBook(object):
    #===========================================================================
    def __add_key_to_tags(self, tags_sl, issue_key):
       tagstring_s = ', '.join(tags_sl).strip() if tags_sl else ''
-      key_tag_s = db.create_key_tag_s(issue_key) if issue_key != None else ComicBook.CVDBSKIP 
+      key_tag_s = db.create_key_tag_s(issue_key) if issue_key != None else ComicBook.GCDBSKIP 
       if key_tag_s and tagstring_s:
          matches = False
          prev_issue_key = db.parse_key_tag(tagstring_s)
@@ -454,7 +454,7 @@ class ComicBook(object):
    #===========================================================================
    def __add_key_to_notes(self, notestring_s, issue_key):
       notestring_s = notestring_s.strip() if notestring_s else ''
-      key_tag_s = db.create_key_tag_s(issue_key) if issue_key != None else ComicBook.CVDBSKIP
+      key_tag_s = db.create_key_tag_s(issue_key) if issue_key != None else ComicBook.GCDBSKIP
       date_s = " on "+strftime(r'%Y.%m.%d %X') if self.__scraper.config.note_scrape_date_b else "" 
       key_note_s = 'Scraped metadata from {0} [{1}]{2}.'.format("LocalGCD", key_tag_s, date_s) if key_tag_s else ''
          

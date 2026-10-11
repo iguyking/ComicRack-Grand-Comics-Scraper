@@ -306,7 +306,7 @@ class _PictureBoxPanel(Panel):
  
    def set_image(self, image):
       if not image:
-         image = Resources.createComicVineLogo()
+         image = Resources.createGCDLogo()
       
       self._ratio = 0;
       if image and float(image.Height):

@@ -45,6 +45,11 @@ If the engine finds multiple series matches or fails to identify a niche title a
 2. Enter your modified keywords in the text field prompt and press **Search**.
 3. The grid will instantly update with fresh results pulled straight from your local database without skipping the book.
 
+You can also paste a comics.org series URL (e.g. `https://www.comics.org/series/175/`) or issue URL (e.g. `https://www.comics.org/issue/1006/`) as the search text to jump straight to that series.
+
+### Pinning a Folder to a Series (`gcdinfo.txt`)
+To always match the comics in a folder to one series, put a text file named `gcdinfo.txt` (or `gcdinfo`) in that folder containing the comics.org series or issue URL. ComicVine `cvinfo` files are ignored, because ComicVine IDs don't correspond to GCD IDs.
+
 ---
 
 ## 📄 Open Source License
