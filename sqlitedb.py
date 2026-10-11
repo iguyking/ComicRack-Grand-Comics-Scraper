@@ -30,7 +30,19 @@ else:
 
 from SQLiteFTS import SQLiteConnection as FTSConnection
 
-FTSConnection.InitializeFromDirectory(_script_dir)
+# ComicRack's package installer flattens subdirectories, so the .crplugin ships
+# native\x64\e_sqlite3.dll as e_sqlite3.dll and native\x86\e_sqlite3.dll as
+# e_sqlite3_x86.dll next to this script
+from System import Environment
+_arch = 'x64' if Environment.Is64BitProcess else 'x86'
+_native_sqlite = Path.Combine(_script_dir, 'native', _arch, 'e_sqlite3.dll')
+_flat_sqlite = Path.Combine(_script_dir, 'e_sqlite3.dll' if _arch == 'x64' else 'e_sqlite3_x86.dll')
+if File.Exists(_native_sqlite):
+   FTSConnection.InitializeFromDirectory(_script_dir)
+elif File.Exists(_flat_sqlite):
+   FTSConnection.Initialize(_flat_sqlite)
+else:
+   raise Exception("No " + _arch + " SQLite library found at: " + _native_sqlite + " or " + _flat_sqlite)
 
 def fix_mojibake(text):
    """Fixes UTF-8 text encoding anomalies."""

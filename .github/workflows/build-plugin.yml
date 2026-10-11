@@ -25,11 +25,33 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "file=$name.crplugin" >> "$GITHUB_OUTPUT"
 
-      - name: Package tracked files (excluding CI files)
+      # ComicRack's package installer drops subdirectory paths and extracts every
+      # file into the plugin's root folder, so build a flat archive up front and
+      # fail if two files would collide with different contents.
+      - name: Package tracked files flat (excluding CI files)
         run: |
-          mkdir -p dist
-          git archive --format=zip -o "dist/${{ steps.meta.outputs.file }}" HEAD -- . \
-            ':(exclude).github' ':(exclude).gitignore' ':(exclude).gitattributes'
+          set -euo pipefail
+          mkdir -p dist stage flat
+          git archive --format=tar HEAD -- . \
+            ':(exclude).github' ':(exclude).gitignore' ':(exclude).gitattributes' \
+            | tar -x -C stage
+          # The x86 SQLite build is renamed so it doesn't collide with the x64 one;
+          # sqlitedb.py looks for e_sqlite3_x86.dll in 32-bit processes.
+          mv stage/native/x86/e_sqlite3.dll stage/e_sqlite3_x86.dll
+          find stage -type f | sort | while read -r src; do
+            dest="flat/$(basename "$src")"
+            if [ -e "$dest" ]; then
+              if cmp -s "$src" "$dest"; then
+                echo "Skipping identical duplicate: ${src#stage/}"
+              else
+                echo "::error::Name collision when flattening: ${src#stage/} differs from existing $(basename "$src")"
+                exit 1
+              fi
+            else
+              cp "$src" "$dest"
+            fi
+          done
+          (cd flat && zip -X -q "../dist/${{ steps.meta.outputs.file }}" *)
           unzip -l "dist/${{ steps.meta.outputs.file }}"
 
       - uses: actions/upload-artifact@v4

@@ -86,6 +86,19 @@ try:
             except Exception as ex3:
                 _PIL_ERROR = "Method 2 failed: " + str(ex3)
                 hash_log.debug("Method 2 failed: " + str(ex3))
+
+        # Method 3: ComicRack's package installer flattens subdirectories,
+        # so pureimage.py may sit directly in the plugin folder
+        if not _PIL_AVAILABLE:
+            try:
+                hash_log.debug("Trying flat pureimage module...")
+                from pureimage import PureImage as PILImage, Resampling
+                PILImage.Resampling = Resampling
+                _PIL_AVAILABLE = True
+                hash_log.debug("pureimage imported directly!")
+            except Exception as ex4:
+                _PIL_ERROR = "Method 3 failed: " + str(ex4)
+                hash_log.debug("Method 3 failed: " + str(ex4))
     except Exception as ex_outer:
         _PIL_ERROR = "Outer exception: " + str(ex_outer)
 
