@@ -28,7 +28,7 @@ class Resources(object):
    
    # Unique XML identifier for your standalone version
    I18N_XML_ENTRY = 'Script.GCDLocalScraper.xml'
-   SCRIPT_VERSION = "1.0.0"
+   SCRIPT_VERSION = "1.0.2"  # keep in sync with Version= in package.ini
    SCRIPT_FULLNAME = 'Local GCD Scraper - v' + SCRIPT_VERSION
 
    #==============================================================================

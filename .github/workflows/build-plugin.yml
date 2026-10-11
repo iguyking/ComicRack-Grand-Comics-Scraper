@@ -71,7 +71,12 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # Tags with a suffix (e.g. v1.0.2-beta.1) are published as pre-releases
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" dist/*.crplugin --repo "${{ github.repository }}" --generate-notes
+          TAG: ${{ github.ref_name }}
+        run: |
+          prerelease=""
+          case "$TAG" in *-*) prerelease="--prerelease" ;; esac
+          gh release create "$TAG" dist/*.crplugin --repo "${{ github.repository }}" --generate-notes $prerelease
